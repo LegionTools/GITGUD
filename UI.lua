@@ -241,10 +241,10 @@ local function CreateFrameOnce()
 	-- A few pixels of left padding - flush against the scroll frame's own
 	-- edge clipped the first glyph or two of the first line (confirmed
 	-- live: "ЗАГЛУШКА" rendered as "ГЛУШКА").
-	contentText:SetPoint("TOPLEFT", 6, 0)
+	contentText:SetPoint("TOPLEFT", 16, 0)
 	contentText:SetJustifyH("LEFT")
 	contentText:SetJustifyV("TOP")
-	local contentWidth = FRAME_WIDTH - BOSS_LIST_WIDTH - 66
+	local contentWidth = FRAME_WIDTH - BOSS_LIST_WIDTH - 76
 	contentText:SetWidth(contentWidth)
 	contentScrollChild:SetSize(contentWidth, 1)
 	-- FontStrings don't support SetScript/OnTextChanged (that's an EditBox
