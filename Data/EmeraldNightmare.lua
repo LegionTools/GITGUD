@@ -1,9 +1,15 @@
 -- Phase 1 placeholder data for the first raid stub, used to exercise the
 -- difficulty selector (dungeons only ever have one difficulty bucket, so
 -- this is the only way to test that UI path before phase 3 fills in real
--- raid content). Real map ID (1094) and boss creature IDs are taken from
--- Zygor's own guide, same as TheArcway.lua.
-local instance = GITGUD.RegisterInstance(1094, "Emerald Nightmare", "raid")
+-- raid content). Boss creature IDs are taken from Zygor's own guide, same
+-- as TheArcway.lua.
+--
+-- Map ID 1520, from BigWigs/Loader.lua - NOT Zygor's own mapid=1094 for
+-- this guide (that turned out to be a different ID space entirely, see
+-- the big comment in Registry.lua). Unlike The Arcway's 1516, this one
+-- hasn't been confirmed live via /gitguddebug yet (would need an actual
+-- raid run) - treat it as high-confidence, not certain.
+local instance = GITGUD.RegisterInstance(1520, "Emerald Nightmare", "raid")
 
 local function StubAllDifficulties(boss, label)
 	for _, difficultyKey in ipairs({ "lfr", "normal_heroic", "mythic" }) do

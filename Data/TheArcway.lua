@@ -12,7 +12,11 @@
 -- Dungeon name confirmed live by the user playing on the RU client:
 -- "Катакомбы Сурамара" (not my earlier transliterated guess "Аркона").
 -- Boss names below are still my own transliteration, unconfirmed.
-local instance = GITGUD.RegisterInstance(1079, "Катакомбы Сурамара", "dungeon")
+--
+-- Map ID 1516 (NOT Zygor's own mapid=1079 for this guide - confirmed via
+-- /gitguddebug live and cross-checked against BigWigs/Loader.lua, see the
+-- big comment in Registry.lua for why those two IDs differ).
+local instance = GITGUD.RegisterInstance(1516, "Катакомбы Сурамара", "dungeon")
 
 local xakal = GITGUD.AddBoss(instance, "Генерал Ксакал", 98206)
 GITGUD.SetBossText(xakal, "normal", "everyone",
