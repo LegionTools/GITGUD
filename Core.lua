@@ -341,28 +341,3 @@ SlashCmdList["GITGUDDEBUG"] = function()
 		return ids
 	end)(), ", "))
 end
-
--- /gitgudhtmltest <1-3> - SimpleHTML turned out not to render on this
--- client at all (confirmed: even plain text with zero markup measured
--- height=0), so the content pane went back to plain FontStrings using
--- WoW's native |H...|h[...]|h|r hyperlink escape sequence instead. Open
--- the window first (/gitgudtest arcway), then run each variant and look
--- at the window: variant 3's "a link" should be colored, show a real
--- spell tooltip on hover, and open BigWigs on click.
-local HTML_TEST_VARIANTS = {
-	"Plain text, no markup at all.",
-	"Text with a literal\nline break.",
-	"Text with |cff71d5ff|Hspell:212030|h[a link]|h|r inside it.",
-}
-SLASH_GITGUDHTMLTEST1 = "/gitgudhtmltest"
-SlashCmdList["GITGUDHTMLTEST"] = function(msg)
-	local index = tonumber(msg) or 1
-	local text = HTML_TEST_VARIANTS[index]
-	if not text then
-		print(string.format("|cff33ccff[GITGUD]|r usage: /gitgudhtmltest <1-%d>", #HTML_TEST_VARIANTS))
-		return
-	end
-	local height, err = GITGUD.DebugSetContentHTML(text)
-	print(string.format("|cff33ccff[GITGUD]|r variant %d height=%s err=%s text=%q",
-		index, tostring(height), tostring(err), text))
-end

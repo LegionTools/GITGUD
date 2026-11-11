@@ -27,6 +27,9 @@ local frame, bossScrollChild, everyoneText, roleText, contentScrollChild
 local bossScrollFrame, contentScrollFrame
 local bossRows = {}
 local roleButtons, difficultyButtons = {}, {}
+local spellsHeader
+local spellButtons = {}
+local SPELL_BUTTON_HEIGHT = 16
 
 local function SkinForElvUI(mainFrame, scrollFrames, closeButton)
 	if not _G.ElvUI then return end
@@ -88,20 +91,68 @@ local function GetOrCreateBossRow(index)
 	return row
 end
 
--- Data strings write the lighter `<a href="spell:ID">Name</a>` markup
--- (kept as-is from the SimpleHTML attempt, no need to touch the data
--- files again) - converted here to WoW's real hyperlink escape sequence
--- `|cff71d5ff|Hspell:ID|h[Name]|h|r` for a plain FontString. "\n" in the
--- data is a literal newline a FontString already understands natively,
--- no conversion needed (unlike the SimpleHTML attempt, which needed
--- "<br>").
-local function ConvertLinksForFontString(text)
-	return (text:gsub('<a href="(spell:%d+)">(.-)</a>', "|cff71d5ff|H%1|h[%2]|h|r"))
+-- Data strings write `<a href="spell:ID">Name</a>` markup. Confirmed live
+-- (no OnHyperlinkEnter/Click ever fired, not even once, on a mouse-enabled
+-- parent frame containing a FontString with a real |H...|h[...]|h|r escape
+-- sequence in it) that this client's hyperlink hit-testing is completely
+-- non-functional - the same underlying breakage that already killed
+-- SimpleHTML. So the prose text just gets the markup stripped down to
+-- plain colored text (StripLinksToPlainText, for visual "this is a skill
+-- name" styling only, no click/hover), and every spell actually mentioned
+-- gets pulled out separately (ExtractSpellLinks) to render as its own real
+-- clickable Button below the text - a full widget with its own
+-- OnEnter/OnLeave/OnClick works fine here, it's specifically the
+-- hyperlink-inside-a-block-of-text hit-testing that's broken.
+local function StripLinksToPlainText(text)
+	return (text:gsub('<a href="spell:%d+">(.-)</a>', "|cff71d5ff%1|r"))
+end
+
+local function ExtractSpellLinks(text, seen, ordered)
+	for id, name in text:gmatch('<a href="spell:(%d+)">(.-)</a>') do
+		if not seen[id] then
+			seen[id] = true
+			tinsert(ordered, { id = id, name = name })
+		end
+	end
+end
+
+local function GetOrCreateSpellButton(index)
+	if spellButtons[index] then return spellButtons[index] end
+
+	local button = CreateFrame("Button", nil, contentScrollChild)
+	button:SetHeight(SPELL_BUTTON_HEIGHT)
+	button:SetPoint("TOPLEFT", spellsHeader, "BOTTOMLEFT", 0, -(index - 1) * SPELL_BUTTON_HEIGHT)
+	button:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+
+	button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	button.text:SetPoint("LEFT", 0, 0)
+	button.text:SetJustifyH("LEFT")
+	button.text:SetTextColor(0.44, 0.84, 1) -- matches the |cff71d5ff used for the plain-text highlight
+
+	-- GameTooltip:SetHyperlink is a direct API call, not hit-testing, so it
+	-- isn't affected by the broken OnHyperlinkEnter/Click mechanism above.
+	button:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		local ok = pcall(GameTooltip.SetHyperlink, GameTooltip, "spell:" .. tostring(self.spellID))
+		if not ok then GameTooltip:SetText(self.text:GetText() or "") end
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	button:SetScript("OnClick", function()
+		if not GITGUD.currentInstance then return end
+		local boss = GITGUD.currentInstance.bosses[GITGUD.selectedBossIndex]
+		GITGUD.OpenBigWigsConfigFor(GITGUD.currentInstance, boss)
+	end)
+
+	spellButtons[index] = button
+	return button
 end
 
 local function RefreshContent()
 	local instance, boss = GITGUD.currentInstance, nil
 	if instance then boss = instance.bosses[GITGUD.selectedBossIndex] end
+
+	local rawEveryone, rawRole
 
 	if not (instance and boss) then
 		everyoneText:SetText("")
@@ -111,20 +162,46 @@ local function RefreshContent()
 		local everyone = byDifficulty and byDifficulty.everyone
 		local role = byDifficulty and byDifficulty[GITGUD.currentRole]
 
-		everyoneText:SetText(everyone and ("|cffffd200Для всех:|r\n" .. ConvertLinksForFontString(everyone)) or "")
+		rawEveryone = everyone
+		everyoneText:SetText(everyone and ("|cffffd200Для всех:|r\n" .. StripLinksToPlainText(everyone)) or "")
 
 		local roleBody
 		if not byDifficulty then
 			roleBody = "Нет данных для этой сложности."
 		elseif role then
-			roleBody = ConvertLinksForFontString(role)
+			rawRole = role
+			roleBody = StripLinksToPlainText(role)
 		else
 			roleBody = "Особых указаний для этой роли нет — смотри общие советы выше."
 		end
 		roleText:SetText("|cffffd200" .. ROLE_LABELS[GITGUD.currentRole] .. ":|r\n" .. roleBody)
 	end
 
-	contentScrollChild:SetHeight(math.max(1, everyoneText:GetStringHeight() + 12 + roleText:GetStringHeight()))
+	local seen, spells = {}, {}
+	if rawEveryone then ExtractSpellLinks(rawEveryone, seen, spells) end
+	if rawRole then ExtractSpellLinks(rawRole, seen, spells) end
+
+	if #spells > 0 then
+		spellsHeader:Show()
+		for i, spell in ipairs(spells) do
+			local button = GetOrCreateSpellButton(i)
+			button.spellID = spell.id
+			button.text:SetText(spell.name)
+			button:SetWidth(button.text:GetStringWidth() + 4)
+			button:Show()
+		end
+	else
+		spellsHeader:Hide()
+	end
+	for i = #spells + 1, #spellButtons do
+		spellButtons[i]:Hide()
+	end
+
+	local totalHeight = everyoneText:GetStringHeight() + 12 + roleText:GetStringHeight()
+	if #spells > 0 then
+		totalHeight = totalHeight + 12 + SPELL_BUTTON_HEIGHT + (#spells * SPELL_BUTTON_HEIGHT)
+	end
+	contentScrollChild:SetHeight(math.max(1, totalHeight))
 end
 
 local function SelectBoss(index)
@@ -282,36 +359,16 @@ local function CreateFrameOnce()
 
 	local contentWidth = FRAME_WIDTH - BOSS_LIST_WIDTH - 76
 
-	-- SimpleHTML rendered nothing at all on this client - confirmed live,
-	-- even a plain string with zero markup measured height=0 via
-	-- /gitgudhtmltest, so the widget type itself doesn't work here, not
-	-- just the tag syntax. Switched to the much older, more universal
-	-- mechanism instead: plain FontStrings containing WoW's native
-	-- |Hspell:ID|h[Name]|h|r hyperlink escape sequences (what chat links
-	-- and GameTooltip body text have used since Vanilla), with the
-	-- hover/click scripts set on the parent frame (contentScrollChild)
-	-- rather than on the FontStrings themselves - FontStrings can't carry
-	-- scripts, but a mouse-enabled parent frame containing one dispatches
-	-- OnHyperlinkEnter/Leave/Click when the pointer is over a link run
-	-- inside it. Data files keep writing the lighter `<a href="spell:ID">`
-	-- markup; ConvertLinksForFontString (above RefreshContent) converts
-	-- it to the real escape sequence at render time.
-	contentScrollChild:EnableMouse(true)
-	contentScrollChild:SetScript("OnHyperlinkEnter", function(self, link)
-		GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
-		local ok2 = pcall(GameTooltip.SetHyperlink, GameTooltip, link)
-		if not ok2 then GameTooltip:SetText(link) end
-		GameTooltip:Show()
-	end)
-	contentScrollChild:SetScript("OnHyperlinkLeave", function() GameTooltip:Hide() end)
-	contentScrollChild:SetScript("OnHyperlinkClick", function(_, link)
-		local spellID = tonumber(link:match("^spell:(%d+)"))
-		if spellID and GITGUD.currentInstance then
-			local boss = GITGUD.currentInstance.bosses[GITGUD.selectedBossIndex]
-			GITGUD.OpenBigWigsConfigFor(GITGUD.currentInstance, boss)
-		end
-	end)
-
+	-- SimpleHTML rendered nothing at all on this client (confirmed live,
+	-- even plain text with zero markup measured height=0), and a plain
+	-- FontString's embedded |H...|h[...]|h|r hyperlink escape sequence
+	-- never fired OnHyperlinkEnter/Click either (confirmed live with debug
+	-- prints in both handlers - neither ever printed). This client's
+	-- hyperlink hit-testing is just broken outright, for every widget type.
+	-- So spell mentions render as plain colored text inline (no click/
+	-- hover), and each one also gets its own real Button below the text
+	-- (see GetOrCreateSpellButton/spellsHeader) - a full widget has its own
+	-- OnEnter/OnLeave/OnClick independent of the broken in-text hit-test.
 	everyoneText = contentScrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	-- A few pixels of left padding - flush against the scroll frame's own
 	-- edge clipped the first glyph or two of the first line (confirmed
@@ -326,6 +383,11 @@ local function CreateFrameOnce()
 	roleText:SetJustifyH("LEFT")
 	roleText:SetJustifyV("TOP")
 	roleText:SetWidth(contentWidth)
+
+	spellsHeader = contentScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	spellsHeader:SetPoint("TOPLEFT", roleText, "BOTTOMLEFT", 0, -12)
+	spellsHeader:SetJustifyH("LEFT")
+	spellsHeader:SetText("|cffffd200Способности:|r")
 
 	contentScrollChild:SetSize(contentWidth, 1)
 	-- FontStrings don't support SetScript/OnTextChanged - RefreshContent
@@ -437,17 +499,3 @@ function GITGUD.ToggleWindow()
 	end
 end
 
--- SimpleHTML turned out not to render anything at all on this client
--- (confirmed via the old version of this function and /gitgudhtmltest in
--- Core.lua), which is why the content pane went back to plain
--- FontStrings. Kept as a debug hook on the FontString version too, in
--- case the hyperlink escape sequence needs the same kind of live
--- poke-and-measure treatment.
-function GITGUD.DebugSetContentHTML(text)
-	if not roleText then
-		return nil, "roleText doesn't exist yet - open the window first"
-	end
-	roleText:SetText(text)
-	contentScrollChild:SetHeight(math.max(1, everyoneText:GetStringHeight() + 12 + roleText:GetStringHeight()))
-	return roleText:GetStringHeight()
-end

@@ -81,14 +81,19 @@ end
 -- with no addition for a given role simply gets no SetBossText call for
 -- it; the UI falls back to "no extra tip for this role".
 --
--- text is now a small HTML subset (rendered via a SimpleHTML widget, not
--- a plain FontString) so spell names can be tagged as clickable links:
--- write `<a href="spell:12345">Spell Name</a>` inline wherever a spell is
--- mentioned - hovering shows its real tooltip (GameTooltip:SetHyperlink),
--- clicking tries to deep-link into that boss's BigWigs options (see
--- Core.lua's GITGUD.OpenBigWigsConfigFor). "\n" is still used for line
--- breaks within a role's text (converted to <br/> at render time) -
--- don't write raw <br/> in these strings directly.
+-- text is a small HTML-like subset rendered into a plain FontString, not
+-- a real HTML widget: write `<a href="spell:12345">Spell Name</a>` inline
+-- wherever a spell is mentioned. This client's hyperlink hit-testing is
+-- confirmed broken outright (neither SimpleHTML nor a FontString's own
+-- |H...|h[...]|h|r escape ever fires OnHyperlinkEnter/Click here), so the
+-- UI only strips this markup down to plain colored text inline - the
+-- actual clicking/hovering happens on a separate list of real Button
+-- widgets below the text, one per spell mentioned (see UI.lua's
+-- GetOrCreateSpellButton/ExtractSpellLinks), each showing a real tooltip
+-- (GameTooltip:SetHyperlink) and deep-linking into that boss's BigWigs
+-- options on click (Core.lua's GITGUD.OpenBigWigsConfigFor). "\n" is a
+-- literal line break a FontString already understands - don't write
+-- <br/> in these strings.
 function GITGUD.SetBossText(boss, difficultyKey, role, text)
 	boss.difficulties[difficultyKey] = boss.difficulties[difficultyKey] or {}
 	boss.difficulties[difficultyKey][role] = text
