@@ -199,14 +199,17 @@ local function CreateFrameOnce()
 	f.title:SetPoint("TOP", 0, -8)
 	f.title:SetText("GITGUD")
 
-	-- Compact-mode toggle: icon-only, no text, standard Blizzard minimize
-	-- button art, sitting just left of the close button.
+	-- Compact-mode toggle: icon-only, no text, sitting just left of the
+	-- close button. UI-Panel-MinimizeButton rendered as a plain X (either
+	-- missing on this client or visually indistinguishable from the close
+	-- button) - using the plus/minus expand-collapse icons instead, the
+	-- same ones Blizzard's own collapsible headers (talents, quest log)
+	-- use, and present in every WoW version. Shows minus (collapse) while
+	-- expanded, plus (expand) while compact - ApplyCompactMode swaps it.
 	f.compactButton = CreateFrame("Button", nil, f)
 	f.compactButton:SetSize(20, 20)
 	f.compactButton:SetPoint("TOPRIGHT", f.CloseButton, "TOPLEFT", 2, 0)
-	f.compactButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Up")
-	f.compactButton:SetPushedTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Down")
-	f.compactButton:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
+	f.compactButton:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
 	f.compactButton:SetScript("OnClick", function() GITGUD.ToggleCompactMode() end)
 
 	-- Difficulty row (top, under the title) - hidden entirely for dungeons.
@@ -312,13 +315,23 @@ local function ApplyCompactMode()
 	frame.difficultyRow:SetShown(not compact and isRaid)
 	frame.roleRow:SetShown(not compact)
 
+	if compact then
+		frame.compactButton:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
+		frame.compactButton:SetPushedTexture("Interface\\Buttons\\UI-PlusButton-Down")
+	else
+		frame.compactButton:SetNormalTexture("Interface\\Buttons\\UI-MinusButton-Up")
+		frame.compactButton:SetPushedTexture("Interface\\Buttons\\UI-MinusButton-Down")
+	end
+
 	contentScrollFrame:ClearAllPoints()
 	local contentWidth
 	if compact then
 		frame:SetSize(COMPACT_WIDTH, COMPACT_HEIGHT)
 		contentScrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -32)
-		contentScrollFrame:SetPoint("BOTTOMRIGHT", -28, 10)
-		contentWidth = COMPACT_WIDTH - 32
+		-- 16px more right padding than the normal layout's -28 - the text
+		-- was running flush against the scrollbar in compact mode.
+		contentScrollFrame:SetPoint("BOTTOMRIGHT", -44, 10)
+		contentWidth = COMPACT_WIDTH - 48
 	else
 		frame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
 		contentScrollFrame:SetPoint("TOPLEFT", bossScrollFrame, "TOPRIGHT", 12, 0)
