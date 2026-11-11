@@ -23,7 +23,7 @@ GITGUD.currentDifficulty = nil
 GITGUD.currentRole = nil
 GITGUD.selectedBossIndex = nil
 
-local frame, bossScrollChild, everyoneText, roleText, contentScrollChild
+local frame, bossScrollChild, contentHTML, contentScrollChild
 local bossScrollFrame, contentScrollFrame
 local bossRows = {}
 local roleButtons, difficultyButtons = {}, {}
@@ -88,32 +88,41 @@ local function GetOrCreateBossRow(index)
 	return row
 end
 
+-- Data strings use "\n" for line breaks (SimpleHTML doesn't treat a raw
+-- newline as one, unlike a FontString) and may embed literal
+-- `<a href="spell:ID">Name</a>` tags - converted to <br/> here rather
+-- than rewriting every data file to use <br/> directly.
+local function ToHTML(text)
+	return (text:gsub("\n", "<br/>"))
+end
+
 local function RefreshContent()
 	local instance, boss = GITGUD.currentInstance, nil
 	if instance then boss = instance.bosses[GITGUD.selectedBossIndex] end
 
-	if not (instance and boss) then
-		everyoneText:SetText("")
-		roleText:SetText("")
-	else
+	local html = ""
+	if instance and boss then
 		local byDifficulty = boss.difficulties[GITGUD.currentDifficulty]
 		local everyone = byDifficulty and byDifficulty.everyone
 		local role = byDifficulty and byDifficulty[GITGUD.currentRole]
 
-		everyoneText:SetText(everyone and ("|cffffd200Для всех:|r\n" .. everyone) or "")
+		if everyone then
+			html = html .. "<p>|cffffd200Для всех:|r<br/>" .. ToHTML(everyone) .. "</p>"
+		end
 
 		local roleBody
 		if not byDifficulty then
 			roleBody = "Нет данных для этой сложности."
 		elseif role then
-			roleBody = role
+			roleBody = ToHTML(role)
 		else
 			roleBody = "Особых указаний для этой роли нет — смотри общие советы выше."
 		end
-		roleText:SetText("|cffffd200" .. ROLE_LABELS[GITGUD.currentRole] .. ":|r\n" .. roleBody)
+		html = html .. "<p>|cffffd200" .. ROLE_LABELS[GITGUD.currentRole] .. ":|r<br/>" .. roleBody .. "</p>"
 	end
 
-	contentScrollChild:SetHeight(math.max(1, everyoneText:GetStringHeight() + 12 + roleText:GetStringHeight()))
+	contentHTML:SetText(html)
+	contentScrollChild:SetHeight(math.max(1, contentHTML:GetHeight()))
 end
 
 local function SelectBoss(index)
@@ -271,29 +280,45 @@ local function CreateFrameOnce()
 
 	local contentWidth = FRAME_WIDTH - BOSS_LIST_WIDTH - 76
 
-	-- Everyone's common tip (Zygor's "_EVERYONE:_" block) on top, the
-	-- selected role's own tip below it - two separate FontStrings rather
-	-- than folding everyone's text into each role's string, so it's shown
-	-- once instead of duplicated three times over.
-	everyoneText = contentScrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	-- SimpleHTML instead of a plain FontString - only widget type that
+	-- supports clickable <a> links with hover/click callbacks, needed for
+	-- spell-name links (tooltip on hover, BigWigs deep-link on click, see
+	-- Core.lua). "Для всех" and the selected role's text are two <p>
+	-- blocks inside one widget rather than two separate FontStrings.
+	local ok, html = pcall(CreateFrame, "SimpleHTML", nil, contentScrollChild)
+	if not ok or not html then
+		error("GITGUD: SimpleHTML widget type isn't available on this client")
+	end
+	contentHTML = html
+	contentHTML:SetFontObject("p", GameFontHighlight)
+	contentHTML:SetFontObject("a", GameFontHighlight)
 	-- A few pixels of left padding - flush against the scroll frame's own
-	-- edge clipped the first glyph or two of the first line (confirmed
-	-- live: "ЗАГЛУШКА" rendered as "ГЛУШКА").
-	everyoneText:SetPoint("TOPLEFT", 16, 0)
-	everyoneText:SetJustifyH("LEFT")
-	everyoneText:SetJustifyV("TOP")
-	everyoneText:SetWidth(contentWidth)
+	-- edge clipped the first glyph or two of the first line in the old
+	-- FontString version (confirmed live: "ЗАГЛУШКА" rendered as
+	-- "ГЛУШКА") - kept the same inset here.
+	contentHTML:SetPoint("TOPLEFT", 16, 0)
+	contentHTML:SetWidth(contentWidth)
 
-	roleText = contentScrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	roleText:SetPoint("TOPLEFT", everyoneText, "BOTTOMLEFT", 0, -12)
-	roleText:SetJustifyH("LEFT")
-	roleText:SetJustifyV("TOP")
-	roleText:SetWidth(contentWidth)
+	contentHTML:SetScript("OnHyperlinkEnter", function(self, link)
+		GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+		local ok2 = pcall(GameTooltip.SetHyperlink, GameTooltip, link)
+		if not ok2 then GameTooltip:SetText(link) end
+		GameTooltip:Show()
+	end)
+	contentHTML:SetScript("OnHyperlinkLeave", function() GameTooltip:Hide() end)
+	contentHTML:SetScript("OnHyperlinkClick", function(_, link)
+		local spellID = tonumber(link:match("^spell:(%d+)"))
+		if spellID and GITGUD.currentInstance then
+			local boss = GITGUD.currentInstance.bosses[GITGUD.selectedBossIndex]
+			GITGUD.OpenBigWigsConfigFor(GITGUD.currentInstance, boss)
+		end
+	end)
 
 	contentScrollChild:SetSize(contentWidth, 1)
-	-- FontStrings don't support SetScript/OnTextChanged (that's an EditBox
-	-- script) - RefreshContent resizes the scroll child by hand instead,
-	-- right after every SetText.
+	-- SimpleHTML auto-sizes its height to the content once a width is set
+	-- and :SetText() has run - RefreshContent reads that back via
+	-- :GetHeight() to resize the scroll child, same idea as the old
+	-- FontString version's :GetStringHeight().
 
 	tinsert(UISpecialFrames, "GITGUDFrame")
 	f:Hide()
@@ -344,8 +369,7 @@ local function ApplyCompactMode()
 		contentWidth = FRAME_WIDTH - BOSS_LIST_WIDTH - 76
 	end
 
-	everyoneText:SetWidth(contentWidth)
-	roleText:SetWidth(contentWidth)
+	contentHTML:SetWidth(contentWidth)
 	contentScrollChild:SetWidth(contentWidth)
 	RefreshContent()
 end

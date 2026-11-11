@@ -8,6 +8,77 @@ function GITGUD.IsBossKilled(creatureID)
 	return GITGUD.killedBosses[creatureID] or false
 end
 
+-- Clicking a spell link in the guidance text tries to deep-link straight
+-- into BigWigs' own config for that boss. BigWigs_Options is its own
+-- load-on-demand addon (the global BigWigsOptions doesn't exist until it's
+-- loaded), and BigWigs' options UI has no public API for opening to a
+-- specific module/spell - this walks the same AceGUI widget chain
+-- BigWigsOptions:OpenConfig() itself builds (Frame -> TabGroup -> on
+-- selecting "bigwigs"/"littlewigs", a TreeGroup -> on selecting the zone,
+-- a DropdownGroup listing that zone's boss modules), using each widget's
+-- own public AceGUI methods (:SelectTab/:SelectByValue/:SetGroup) rather
+-- than any BigWigs-private function. Confirmed by reading
+-- BigWigs_Options/Options.lua directly (OpenConfig, onTabGroupSelected,
+-- onZoneShow) - this client's BigWigs version is frozen (private server,
+-- never updates), so there's no ongoing breakage risk from relying on
+-- this internal structure, only the risk of having read it wrong the
+-- first time; hence the pcall and the fallback to just opening the
+-- general config window if any step doesn't find what it expects.
+local function GetBigWigsOptions()
+	if not BigWigsOptions then
+		pcall(UIParentLoadAddOn, "BigWigs_Options")
+	end
+	return BigWigsOptions
+end
+
+function GITGUD.OpenBigWigsConfigFor(instance, boss)
+	local bwOptions = GetBigWigsOptions()
+	if not bwOptions then
+		print("|cff33ccff[GITGUD]|r BigWigs_Options isn't available on this client.")
+		return
+	end
+
+	local moduleName = boss and boss.bigwigsModule
+	local isRaid = instance.kind == "raid"
+
+	local ok, err = pcall(function()
+		local bw = bwOptions:IsOpen()
+		if not bw then
+			bwOptions:OpenConfig()
+			bw = bwOptions:IsOpen()
+		end
+		if not bw then error("BigWigs config frame did not open") end
+		if not moduleName then return end -- no installed module for this boss - general config is all we can offer
+
+		local tabs
+		for _, child in ipairs(bw.children or {}) do
+			if child.SetTabs then
+				tabs = child
+				break
+			end
+		end
+		if not tabs then error("could not find BigWigs' tab group widget") end
+
+		tabs:SelectTab(isRaid and "bigwigs" or "littlewigs")
+
+		local tree = tabs.children and tabs.children[1]
+		if not tree or not tree.SetTree then error("could not find BigWigs' zone tree widget") end
+
+		local headerValue = (isRaid and "BigWigs_" or "LittleWigs_") .. "Legion"
+		tree:SelectByValue(("%s\001%d"):format(headerValue, instance.mapid))
+
+		local outerContainer = tree.children and tree.children[1]
+		local innerContainer = outerContainer and outerContainer.children and outerContainer.children[1]
+		if innerContainer and innerContainer.SetGroup then
+			innerContainer:SetGroup(moduleName)
+		end
+	end)
+
+	if not ok then
+		print("|cff33ccff[GITGUD]|r BigWigs deep-link failed (" .. tostring(err) .. "); opened the general config instead.")
+	end
+end
+
 -- GetSpecializationRole-style APIs have been unreliable on this server for
 -- other addons in this set (MountPetLink hit several missing/placeholder
 -- APIs) - defensive pcalls throughout, defaulting to "dps" whenever

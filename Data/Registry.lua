@@ -49,8 +49,19 @@ function GITGUD.RegisterInstance(mapid, name, kind)
 	return instance
 end
 
-function GITGUD.AddBoss(instance, name, creatureID)
-	local boss = { name = name, creatureID = creatureID, difficulties = {} }
+-- bigwigsModule (optional) is BigWigs' own internal module name for this
+-- boss - the exact first argument passed to BigWigs:NewBoss(...) in that
+-- boss's file (confirmed by reading the installed BigWigs_Legion source;
+-- e.g. Nightmare/Nythendra.lua:13 is
+-- `BigWigs:NewBoss("Nythendra", 1520, 1703)`, so bigwigsModule="Nythendra"
+-- here deep-links correctly). Only set it when a real BigWigs module for
+-- this exact boss is actually installed - leave it nil otherwise (e.g. no
+-- LittleWigs zone content is installed for any Legion dungeon on this
+-- client at all, confirmed by checking the AddOns folder, so no dungeon
+-- boss should ever get one right now). When nil, clicking a spell link
+-- for this boss just opens BigWigs' general config instead of deep-linking.
+function GITGUD.AddBoss(instance, name, creatureID, bigwigsModule)
+	local boss = { name = name, creatureID = creatureID, difficulties = {}, bigwigsModule = bigwigsModule }
 	tinsert(instance.bosses, boss)
 	return boss
 end
@@ -61,6 +72,15 @@ end
 -- rather than it being duplicated into all three role strings. A boss
 -- with no addition for a given role simply gets no SetBossText call for
 -- it; the UI falls back to "no extra tip for this role".
+--
+-- text is now a small HTML subset (rendered via a SimpleHTML widget, not
+-- a plain FontString) so spell names can be tagged as clickable links:
+-- write `<a href="spell:12345">Spell Name</a>` inline wherever a spell is
+-- mentioned - hovering shows its real tooltip (GameTooltip:SetHyperlink),
+-- clicking tries to deep-link into that boss's BigWigs options (see
+-- Core.lua's GITGUD.OpenBigWigsConfigFor). "\n" is still used for line
+-- breaks within a role's text (converted to <br/> at render time) -
+-- don't write raw <br/> in these strings directly.
 function GITGUD.SetBossText(boss, difficultyKey, role, text)
 	boss.difficulties[difficultyKey] = boss.difficulties[difficultyKey] or {}
 	boss.difficulties[difficultyKey][role] = text
