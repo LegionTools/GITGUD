@@ -8,5 +8,6 @@
 Data/Registry.lua
 Data/TheArcway.lua
 Data/EmeraldNightmare.lua
+Data/Antorus.lua
 UI.lua
 Core.lua
