@@ -23,7 +23,7 @@ GITGUD.currentDifficulty = nil
 GITGUD.currentRole = nil
 GITGUD.selectedBossIndex = nil
 
-local frame, bossScrollChild, contentHTML, contentScrollChild
+local frame, bossScrollChild, everyoneText, roleText, contentScrollChild
 local bossScrollFrame, contentScrollFrame
 local bossRows = {}
 local roleButtons, difficultyButtons = {}, {}
@@ -88,44 +88,43 @@ local function GetOrCreateBossRow(index)
 	return row
 end
 
--- Data strings use "\n" for line breaks (SimpleHTML doesn't treat a raw
--- newline as one, unlike a FontString) and may embed literal
--- `<a href="spell:ID">Name</a>` tags - converted to <br> here rather than
--- rewriting every data file directly. Plain "<br>", not the self-closing
--- "<br/>" - the self-closing form silently produced an empty pane live
--- (this isn't a real HTML parser, just Blizzard's own small tag lexer,
--- and it apparently doesn't recognize the XHTML-style slash).
-local function ToHTML(text)
-	return (text:gsub("\n", "<br>"))
+-- Data strings write the lighter `<a href="spell:ID">Name</a>` markup
+-- (kept as-is from the SimpleHTML attempt, no need to touch the data
+-- files again) - converted here to WoW's real hyperlink escape sequence
+-- `|cff71d5ff|Hspell:ID|h[Name]|h|r` for a plain FontString. "\n" in the
+-- data is a literal newline a FontString already understands natively,
+-- no conversion needed (unlike the SimpleHTML attempt, which needed
+-- "<br>").
+local function ConvertLinksForFontString(text)
+	return (text:gsub('<a href="(spell:%d+)">(.-)</a>', "|cff71d5ff|H%1|h[%2]|h|r"))
 end
 
 local function RefreshContent()
 	local instance, boss = GITGUD.currentInstance, nil
 	if instance then boss = instance.bosses[GITGUD.selectedBossIndex] end
 
-	local html = ""
-	if instance and boss then
+	if not (instance and boss) then
+		everyoneText:SetText("")
+		roleText:SetText("")
+	else
 		local byDifficulty = boss.difficulties[GITGUD.currentDifficulty]
 		local everyone = byDifficulty and byDifficulty.everyone
 		local role = byDifficulty and byDifficulty[GITGUD.currentRole]
 
-		if everyone then
-			html = html .. "<p>|cffffd200Для всех:|r<br>" .. ToHTML(everyone) .. "</p>"
-		end
+		everyoneText:SetText(everyone and ("|cffffd200Для всех:|r\n" .. ConvertLinksForFontString(everyone)) or "")
 
 		local roleBody
 		if not byDifficulty then
 			roleBody = "Нет данных для этой сложности."
 		elseif role then
-			roleBody = ToHTML(role)
+			roleBody = ConvertLinksForFontString(role)
 		else
 			roleBody = "Особых указаний для этой роли нет — смотри общие советы выше."
 		end
-		html = html .. "<p>|cffffd200" .. ROLE_LABELS[GITGUD.currentRole] .. ":|r<br>" .. roleBody .. "</p>"
+		roleText:SetText("|cffffd200" .. ROLE_LABELS[GITGUD.currentRole] .. ":|r\n" .. roleBody)
 	end
 
-	contentHTML:SetText(html)
-	contentScrollChild:SetHeight(math.max(1, contentHTML:GetHeight()))
+	contentScrollChild:SetHeight(math.max(1, everyoneText:GetStringHeight() + 12 + roleText:GetStringHeight()))
 end
 
 local function SelectBoss(index)
@@ -283,36 +282,29 @@ local function CreateFrameOnce()
 
 	local contentWidth = FRAME_WIDTH - BOSS_LIST_WIDTH - 76
 
-	-- SimpleHTML instead of a plain FontString - only widget type that
-	-- supports clickable <a> links with hover/click callbacks, needed for
-	-- spell-name links (tooltip on hover, BigWigs deep-link on click, see
-	-- Core.lua). "Для всех" and the selected role's text are two <p>
-	-- blocks inside one widget rather than two separate FontStrings.
-	local ok, html = pcall(CreateFrame, "SimpleHTML", nil, contentScrollChild)
-	if not ok or not html then
-		error("GITGUD: SimpleHTML widget type isn't available on this client")
-	end
-	contentHTML = html
-	-- Two-arg SetFontObject(element, font) errored live ("Couldn't find
-	-- font named a") - this client's SimpleHTML only supports the one-arg
-	-- form (sets the default font for every element, since we only ever
-	-- use <p>/<a>, not headers).
-	contentHTML:SetFontObject(GameFontHighlight)
-	-- A few pixels of left padding - flush against the scroll frame's own
-	-- edge clipped the first glyph or two of the first line in the old
-	-- FontString version (confirmed live: "ЗАГЛУШКА" rendered as
-	-- "ГЛУШКА") - kept the same inset here.
-	contentHTML:SetPoint("TOPLEFT", 16, 0)
-	contentHTML:SetWidth(contentWidth)
-
-	contentHTML:SetScript("OnHyperlinkEnter", function(self, link)
+	-- SimpleHTML rendered nothing at all on this client - confirmed live,
+	-- even a plain string with zero markup measured height=0 via
+	-- /gitgudhtmltest, so the widget type itself doesn't work here, not
+	-- just the tag syntax. Switched to the much older, more universal
+	-- mechanism instead: plain FontStrings containing WoW's native
+	-- |Hspell:ID|h[Name]|h|r hyperlink escape sequences (what chat links
+	-- and GameTooltip body text have used since Vanilla), with the
+	-- hover/click scripts set on the parent frame (contentScrollChild)
+	-- rather than on the FontStrings themselves - FontStrings can't carry
+	-- scripts, but a mouse-enabled parent frame containing one dispatches
+	-- OnHyperlinkEnter/Leave/Click when the pointer is over a link run
+	-- inside it. Data files keep writing the lighter `<a href="spell:ID">`
+	-- markup; ConvertLinksForFontString (above RefreshContent) converts
+	-- it to the real escape sequence at render time.
+	contentScrollChild:EnableMouse(true)
+	contentScrollChild:SetScript("OnHyperlinkEnter", function(self, link)
 		GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
 		local ok2 = pcall(GameTooltip.SetHyperlink, GameTooltip, link)
 		if not ok2 then GameTooltip:SetText(link) end
 		GameTooltip:Show()
 	end)
-	contentHTML:SetScript("OnHyperlinkLeave", function() GameTooltip:Hide() end)
-	contentHTML:SetScript("OnHyperlinkClick", function(_, link)
+	contentScrollChild:SetScript("OnHyperlinkLeave", function() GameTooltip:Hide() end)
+	contentScrollChild:SetScript("OnHyperlinkClick", function(_, link)
 		local spellID = tonumber(link:match("^spell:(%d+)"))
 		if spellID and GITGUD.currentInstance then
 			local boss = GITGUD.currentInstance.bosses[GITGUD.selectedBossIndex]
@@ -320,11 +312,24 @@ local function CreateFrameOnce()
 		end
 	end)
 
+	everyoneText = contentScrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	-- A few pixels of left padding - flush against the scroll frame's own
+	-- edge clipped the first glyph or two of the first line (confirmed
+	-- live: "ЗАГЛУШКА" rendered as "ГЛУШКА").
+	everyoneText:SetPoint("TOPLEFT", 16, 0)
+	everyoneText:SetJustifyH("LEFT")
+	everyoneText:SetJustifyV("TOP")
+	everyoneText:SetWidth(contentWidth)
+
+	roleText = contentScrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	roleText:SetPoint("TOPLEFT", everyoneText, "BOTTOMLEFT", 0, -12)
+	roleText:SetJustifyH("LEFT")
+	roleText:SetJustifyV("TOP")
+	roleText:SetWidth(contentWidth)
+
 	contentScrollChild:SetSize(contentWidth, 1)
-	-- SimpleHTML auto-sizes its height to the content once a width is set
-	-- and :SetText() has run - RefreshContent reads that back via
-	-- :GetHeight() to resize the scroll child, same idea as the old
-	-- FontString version's :GetStringHeight().
+	-- FontStrings don't support SetScript/OnTextChanged - RefreshContent
+	-- resizes the scroll child by hand instead, right after every SetText.
 
 	tinsert(UISpecialFrames, "GITGUDFrame")
 	f:Hide()
@@ -375,7 +380,8 @@ local function ApplyCompactMode()
 		contentWidth = FRAME_WIDTH - BOSS_LIST_WIDTH - 76
 	end
 
-	contentHTML:SetWidth(contentWidth)
+	everyoneText:SetWidth(contentWidth)
+	roleText:SetWidth(contentWidth)
 	contentScrollChild:SetWidth(contentWidth)
 	RefreshContent()
 end
@@ -431,17 +437,17 @@ function GITGUD.ToggleWindow()
 	end
 end
 
--- The content pane rendered completely empty even after fixing <br/> ->
--- <br> - something more basic about SimpleHTML on this client isn't
--- behaving as expected. Lets /gitgudhtmltest (Core.lua) try a series of
--- minimal variants directly against the live widget and report back its
--- measured height, so the actual working markup can be read off instead
--- of guessed at again.
+-- SimpleHTML turned out not to render anything at all on this client
+-- (confirmed via the old version of this function and /gitgudhtmltest in
+-- Core.lua), which is why the content pane went back to plain
+-- FontStrings. Kept as a debug hook on the FontString version too, in
+-- case the hyperlink escape sequence needs the same kind of live
+-- poke-and-measure treatment.
 function GITGUD.DebugSetContentHTML(text)
-	if not contentHTML then
-		return nil, "contentHTML doesn't exist yet - open the window first"
+	if not roleText then
+		return nil, "roleText doesn't exist yet - open the window first"
 	end
-	contentHTML:SetText(text)
-	contentScrollChild:SetHeight(math.max(1, contentHTML:GetHeight()))
-	return contentHTML:GetHeight()
+	roleText:SetText(text)
+	contentScrollChild:SetHeight(math.max(1, everyoneText:GetStringHeight() + 12 + roleText:GetStringHeight()))
+	return roleText:GetStringHeight()
 end

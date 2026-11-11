@@ -342,19 +342,17 @@ SlashCmdList["GITGUDDEBUG"] = function()
 	end)(), ", "))
 end
 
--- /gitgudhtmltest <1-5> - the content pane rendered empty even after the
--- <br/> -> <br> fix, so something more basic about this client's
--- SimpleHTML needs to be read from a live test rather than guessed at
--- again. Open the window first (/gitgudtest arcway), then run each
--- variant in turn and look at the window + the printed height after
--- each: a height of 0 or ~nil with nothing visible means that variant
--- failed to render; a sane height with visible text means it worked.
+-- /gitgudhtmltest <1-3> - SimpleHTML turned out not to render on this
+-- client at all (confirmed: even plain text with zero markup measured
+-- height=0), so the content pane went back to plain FontStrings using
+-- WoW's native |H...|h[...]|h|r hyperlink escape sequence instead. Open
+-- the window first (/gitgudtest arcway), then run each variant and look
+-- at the window: variant 3's "a link" should be colored, show a real
+-- spell tooltip on hover, and open BigWigs on click.
 local HTML_TEST_VARIANTS = {
-	"Plain text, no tags at all.",
-	"<p>Text inside a lowercase p tag.</p>",
-	"<P>Text inside an uppercase P tag.</P>",
-	"No p tag, just a<br>line break in the middle.",
-	"<p>Text with <a href=\"spell:212030\">a link</a> inside it.</p>",
+	"Plain text, no markup at all.",
+	"Text with a literal\nline break.",
+	"Text with |cff71d5ff|Hspell:212030|h[a link]|h|r inside it.",
 }
 SLASH_GITGUDHTMLTEST1 = "/gitgudhtmltest"
 SlashCmdList["GITGUDHTMLTEST"] = function(msg)
