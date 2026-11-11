@@ -206,9 +206,14 @@ local function CreateFrameOnce()
 	-- same ones Blizzard's own collapsible headers (talents, quest log)
 	-- use, and present in every WoW version. Shows minus (collapse) while
 	-- expanded, plus (expand) while compact - ApplyCompactMode swaps it.
+	-- Anchored to the frame's own corner, not to CloseButton - CloseButton's
+	-- template texture carries its own padding that pushes it visually
+	-- above the frame's top edge, which our plain button then inherited
+	-- when anchored to it (confirmed live: the icon stuck out above the
+	-- window border).
 	f.compactButton = CreateFrame("Button", nil, f)
-	f.compactButton:SetSize(20, 20)
-	f.compactButton:SetPoint("TOPRIGHT", f.CloseButton, "TOPLEFT", 2, 0)
+	f.compactButton:SetSize(16, 16)
+	f.compactButton:SetPoint("TOPRIGHT", f, "TOPRIGHT", -28, -8)
 	f.compactButton:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
 	f.compactButton:SetScript("OnClick", function() GITGUD.ToggleCompactMode() end)
 
