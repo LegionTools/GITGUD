@@ -341,3 +341,30 @@ SlashCmdList["GITGUDDEBUG"] = function()
 		return ids
 	end)(), ", "))
 end
+
+-- /gitgudhtmltest <1-5> - the content pane rendered empty even after the
+-- <br/> -> <br> fix, so something more basic about this client's
+-- SimpleHTML needs to be read from a live test rather than guessed at
+-- again. Open the window first (/gitgudtest arcway), then run each
+-- variant in turn and look at the window + the printed height after
+-- each: a height of 0 or ~nil with nothing visible means that variant
+-- failed to render; a sane height with visible text means it worked.
+local HTML_TEST_VARIANTS = {
+	"Plain text, no tags at all.",
+	"<p>Text inside a lowercase p tag.</p>",
+	"<P>Text inside an uppercase P tag.</P>",
+	"No p tag, just a<br>line break in the middle.",
+	"<p>Text with <a href=\"spell:212030\">a link</a> inside it.</p>",
+}
+SLASH_GITGUDHTMLTEST1 = "/gitgudhtmltest"
+SlashCmdList["GITGUDHTMLTEST"] = function(msg)
+	local index = tonumber(msg) or 1
+	local text = HTML_TEST_VARIANTS[index]
+	if not text then
+		print(string.format("|cff33ccff[GITGUD]|r usage: /gitgudhtmltest <1-%d>", #HTML_TEST_VARIANTS))
+		return
+	end
+	local height, err = GITGUD.DebugSetContentHTML(text)
+	print(string.format("|cff33ccff[GITGUD]|r variant %d height=%s err=%s text=%q",
+		index, tostring(height), tostring(err), text))
+end

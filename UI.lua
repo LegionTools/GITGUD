@@ -430,3 +430,18 @@ function GITGUD.ToggleWindow()
 		print("|cff33ccff[GITGUD]|r нет данных для текущего места - зайди в отслеживаемое подземелье/рейд, или используй /gitgudtest")
 	end
 end
+
+-- The content pane rendered completely empty even after fixing <br/> ->
+-- <br> - something more basic about SimpleHTML on this client isn't
+-- behaving as expected. Lets /gitgudhtmltest (Core.lua) try a series of
+-- minimal variants directly against the live widget and report back its
+-- measured height, so the actual working markup can be read off instead
+-- of guessed at again.
+function GITGUD.DebugSetContentHTML(text)
+	if not contentHTML then
+		return nil, "contentHTML doesn't exist yet - open the window first"
+	end
+	contentHTML:SetText(text)
+	contentScrollChild:SetHeight(math.max(1, contentHTML:GetHeight()))
+	return contentHTML:GetHeight()
+end
