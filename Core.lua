@@ -40,6 +40,17 @@ function GITGUD.DetectDifficultyKey(instance)
 	return "normal_heroic"
 end
 
+-- Shared by auto-open-on-zone-entry, /gitgudtest, and the minimap
+-- right-click menu: wipes progression only when actually switching to a
+-- different instance than whatever was last shown, so manually reopening
+-- the instance you're already in doesn't lose track of killed bosses.
+function GITGUD.OpenInstance(instance)
+	if GITGUD.currentInstance ~= instance then
+		wipe(GITGUD.killedBosses)
+	end
+	GITGUD.ShowWindow(instance)
+end
+
 local function OnEnterWorld()
 	local ok, isInInstance = pcall(IsInInstance)
 	if not ok or not isInInstance then return end
@@ -50,10 +61,7 @@ local function OnEnterWorld()
 	local instance = GITGUD.instances[instanceMapID]
 	if not instance then return end -- no GITGUD data for this place yet
 
-	if GITGUD.currentInstance ~= instance then
-		wipe(GITGUD.killedBosses)
-	end
-	GITGUD.ShowWindow(instance)
+	GITGUD.OpenInstance(instance)
 end
 
 local function OnUnitDied(unitTarget)
@@ -85,6 +93,65 @@ trackerFrame:SetScript("OnEvent", function(_, event, ...)
 	end
 end)
 
+-- Right-click menu on the minimap button: two submenus ("Подземелья" /
+-- "Рейды"), listing every registered instance of that kind - lets you jump
+-- straight to any instance's guide without having to be there, same as
+-- /gitgudtest but as a proper in-game menu. Standard Blizzard
+-- UIDropDownMenu nested-menu pattern (level 1 = the two categories, level
+-- 2 = the instances in whichever category was hovered).
+local instanceMenuFrame
+
+local function InstanceMenu_OnClick(_, instance)
+	CloseDropDownMenus()
+	GITGUD.OpenInstance(instance)
+end
+
+local function InstanceMenu_Initialize(_, level, menuList)
+	if level == 1 then
+		for _, entry in ipairs({ { text = "Подземелья", kind = "dungeon" }, { text = "Рейды", kind = "raid" } }) do
+			local info = UIDropDownMenu_CreateInfo()
+			info.text = entry.text
+			info.hasArrow = true
+			info.menuList = entry.kind
+			info.notCheckable = true
+			UIDropDownMenu_AddButton(info, level)
+		end
+	elseif level == 2 and (menuList == "dungeon" or menuList == "raid") then
+		local any = false
+		for _, instance in ipairs(GITGUD.instancesByOrder) do
+			if instance.kind == menuList then
+				any = true
+				local info = UIDropDownMenu_CreateInfo()
+				info.text = instance.name
+				info.notCheckable = true
+				info.func = InstanceMenu_OnClick
+				info.arg1 = instance
+				UIDropDownMenu_AddButton(info, level)
+			end
+		end
+		if not any then
+			local info = UIDropDownMenu_CreateInfo()
+			info.text = "(пока нет данных)"
+			info.notCheckable = true
+			info.disabled = true
+			UIDropDownMenu_AddButton(info, level)
+		end
+	end
+end
+
+local function ShowInstanceMenu(anchorFrame)
+	local ok, err = pcall(function()
+		if not instanceMenuFrame then
+			instanceMenuFrame = CreateFrame("Frame", "GITGUDInstanceMenu", UIParent, "UIDropDownMenuTemplate")
+			UIDropDownMenu_Initialize(instanceMenuFrame, InstanceMenu_Initialize, "MENU")
+		end
+		ToggleDropDownMenu(1, nil, instanceMenuFrame, anchorFrame, 0, 0)
+	end)
+	if not ok then
+		print("|cff33ccff[GITGUD]|r instance menu failed: " .. tostring(err))
+	end
+end
+
 -- Minimap button: a plain draggable button orbiting the minimap, same
 -- pattern as APUser's, rather than pulling in a full LibDBIcon dependency
 -- for one button.
@@ -107,7 +174,14 @@ local function CreateMinimapButton()
 	button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 	button:SetPoint("CENTER", Minimap, "CENTER", 80, 0)
 
-	button:SetScript("OnClick", function() GITGUD.ToggleWindow() end)
+	button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	button:SetScript("OnClick", function(self, mouseButton)
+		if mouseButton == "RightButton" then
+			ShowInstanceMenu(self)
+		else
+			GITGUD.ToggleWindow()
+		end
+	end)
 
 	button:SetMovable(true)
 	button:EnableMouse(true)
@@ -145,8 +219,7 @@ SlashCmdList["GITGUDTEST"] = function(msg)
 	local needle = (msg or ""):lower()
 	for _, instance in ipairs(GITGUD.instancesByOrder) do
 		if needle == "" or instance.name:lower():find(needle, 1, true) then
-			wipe(GITGUD.killedBosses)
-			GITGUD.ShowWindow(instance)
+			GITGUD.OpenInstance(instance)
 			return
 		end
 	end
