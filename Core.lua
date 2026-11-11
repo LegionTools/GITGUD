@@ -169,3 +169,31 @@ SlashCmdList["GITGUDKILL"] = function(msg)
 	GITGUD.OnBossKilled()
 	print("|cff33ccff[GITGUD]|r marked creatureID " .. creatureID .. " as killed.")
 end
+
+-- /gitguddebug - the auto-open window in The Arcway didn't fire; this
+-- dumps exactly what IsInInstance()/GetInstanceInfo() return on this
+-- client so the mismatch can be diagnosed from evidence instead of
+-- guessed at (this server's build may not return instanceMapID in the
+-- same position retail does, or at all).
+SLASH_GITGUDDEBUG1 = "/gitguddebug"
+SlashCmdList["GITGUDDEBUG"] = function()
+	local ok, isInInstance, instanceType = pcall(IsInInstance)
+	print(string.format("|cff33ccff[GITGUD]|r IsInInstance() ok=%s isInInstance=%s instanceType=%s",
+		tostring(ok), tostring(isInInstance), tostring(instanceType)))
+
+	local results = { pcall(GetInstanceInfo) }
+	print("|cff33ccff[GITGUD]|r GetInstanceInfo() ok=" .. tostring(results[1]))
+	if results[1] then
+		local labels = { "name", "instanceType", "difficultyID", "difficultyName", "maxPlayers",
+			"dynamicDifficulty", "isDynamic", "instanceMapID", "instanceGroupSize", "LfgDungeonID" }
+		for i = 2, #results do
+			print(string.format("  [%d] %s = %s", i - 1, labels[i - 1] or "?", tostring(results[i])))
+		end
+	end
+
+	print("|cff33ccff[GITGUD]|r registered mapids: " .. table.concat((function()
+		local ids = {}
+		for mapid in pairs(GITGUD.instances) do tinsert(ids, tostring(mapid)) end
+		return ids
+	end)(), ", "))
+end

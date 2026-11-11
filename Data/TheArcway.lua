@@ -9,11 +9,10 @@
 -- role (e.g. no _TANK:_ line in Zygor's data) simply has no SetBossText
 -- call for that role - the UI falls back to "no extra tip for this role".
 --
--- Proper nouns (dungeon/boss names) are my own transliteration, not pulled
--- from an official Blizzard RU string table (none was available to check
--- against) - if any of them don't match what the RU client actually shows,
--- it's a one-line fix in this file, not a structural issue.
-local instance = GITGUD.RegisterInstance(1079, "Аркона", "dungeon")
+-- Dungeon name confirmed live by the user playing on the RU client:
+-- "Катакомбы Сурамара" (not my earlier transliterated guess "Аркона").
+-- Boss names below are still my own transliteration, unconfirmed.
+local instance = GITGUD.RegisterInstance(1079, "Катакомбы Сурамара", "dungeon")
 
 local xakal = GITGUD.AddBoss(instance, "Генерал Ксакал", 98206)
 GITGUD.SetBossText(xakal, "normal", "everyone",
