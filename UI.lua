@@ -290,8 +290,11 @@ local function CreateFrameOnce()
 		error("GITGUD: SimpleHTML widget type isn't available on this client")
 	end
 	contentHTML = html
-	contentHTML:SetFontObject("p", GameFontHighlight)
-	contentHTML:SetFontObject("a", GameFontHighlight)
+	-- Two-arg SetFontObject(element, font) errored live ("Couldn't find
+	-- font named a") - this client's SimpleHTML only supports the one-arg
+	-- form (sets the default font for every element, since we only ever
+	-- use <p>/<a>, not headers).
+	contentHTML:SetFontObject(GameFontHighlight)
 	-- A few pixels of left padding - flush against the scroll frame's own
 	-- edge clipped the first glyph or two of the first line in the old
 	-- FontString version (confirmed live: "ЗАГЛУШКА" rendered as
