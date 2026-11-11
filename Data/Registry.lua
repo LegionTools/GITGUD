@@ -55,11 +55,19 @@ end
 -- e.g. Nightmare/Nythendra.lua:13 is
 -- `BigWigs:NewBoss("Nythendra", 1520, 1703)`, so bigwigsModule="Nythendra"
 -- here deep-links correctly). Only set it when a real BigWigs module for
--- this exact boss is actually installed - leave it nil otherwise (e.g. no
--- LittleWigs zone content is installed for any Legion dungeon on this
--- client at all, confirmed by checking the AddOns folder, so no dungeon
--- boss should ever get one right now). When nil, clicking a spell link
--- for this boss just opens BigWigs' general config instead of deep-linking.
+-- this exact boss is actually installed - leave it nil otherwise. When
+-- nil, clicking a spell link for this boss just opens BigWigs' general
+-- config instead of deep-linking.
+--
+-- CORRECTION: an earlier version of this comment claimed no LittleWigs
+-- zone content existed for Legion dungeons on this client - wrong, the
+-- user found it live (BigWigs' own options UI, "Боссы подземелий" tab,
+-- Legion category). This server's BigWigs is a custom "Uwow.biz" build
+-- that bundles dungeon modules directly under LittleWigs/Legion/<Dungeon>/
+-- (e.g. LittleWigs/Legion/TheArcway/Ivanyr.lua), not a separate
+-- "LittleWigs_Legion" addon - a plain folder-name search for that addon
+-- name missed it entirely. Always grep the actual installed files for a
+-- boss's real name before assuming there's no module for it.
 function GITGUD.AddBoss(instance, name, creatureID, bigwigsModule)
 	local boss = { name = name, creatureID = creatureID, difficulties = {}, bigwigsModule = bigwigsModule }
 	tinsert(instance.bosses, boss)
