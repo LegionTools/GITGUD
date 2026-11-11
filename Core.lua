@@ -95,7 +95,7 @@ local function CreateMinimapButton()
 	button:SetFrameLevel(8)
 
 	local icon = button:CreateTexture(nil, "BACKGROUND")
-	icon:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
+	icon:SetTexture("Interface\\Icons\\INV_Misc_Book_16")
 	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	icon:SetAllPoints()
 

@@ -24,6 +24,7 @@ GITGUD.currentRole = nil
 GITGUD.selectedBossIndex = nil
 
 local frame, bossScrollChild, everyoneText, roleText, contentScrollChild
+local bossScrollFrame, contentScrollFrame
 local bossRows = {}
 local roleButtons, difficultyButtons = {}, {}
 
@@ -198,6 +199,16 @@ local function CreateFrameOnce()
 	f.title:SetPoint("TOP", 0, -8)
 	f.title:SetText("GITGUD")
 
+	-- Compact-mode toggle: icon-only, no text, standard Blizzard minimize
+	-- button art, sitting just left of the close button.
+	f.compactButton = CreateFrame("Button", nil, f)
+	f.compactButton:SetSize(20, 20)
+	f.compactButton:SetPoint("TOPRIGHT", f.CloseButton, "TOPLEFT", 2, 0)
+	f.compactButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Up")
+	f.compactButton:SetPushedTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Down")
+	f.compactButton:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
+	f.compactButton:SetScript("OnClick", function() GITGUD.ToggleCompactMode() end)
+
 	-- Difficulty row (top, under the title) - hidden entirely for dungeons.
 	f.difficultyRow = CreateFrame("Frame", nil, f)
 	f.difficultyRow:SetPoint("TOP", 0, -28)
@@ -232,7 +243,7 @@ local function CreateFrameOnce()
 	end
 
 	-- Boss list, left side, below the role row.
-	local bossScrollFrame = CreateFrame("ScrollFrame", "GITGUDBossScrollFrame", f, "UIPanelScrollFrameTemplate")
+	bossScrollFrame = CreateFrame("ScrollFrame", "GITGUDBossScrollFrame", f, "UIPanelScrollFrameTemplate")
 	bossScrollFrame:SetPoint("TOPLEFT", f.roleRow, "BOTTOMLEFT", 0, -8)
 	bossScrollFrame:SetPoint("BOTTOMLEFT", 10, 10)
 	bossScrollFrame:SetWidth(BOSS_LIST_WIDTH)
@@ -242,7 +253,7 @@ local function CreateFrameOnce()
 	bossScrollFrame:SetScrollChild(bossScrollChild)
 
 	-- Content pane, right side.
-	local contentScrollFrame = CreateFrame("ScrollFrame", "GITGUDContentScrollFrame", f, "UIPanelScrollFrameTemplate")
+	contentScrollFrame = CreateFrame("ScrollFrame", "GITGUDContentScrollFrame", f, "UIPanelScrollFrameTemplate")
 	contentScrollFrame:SetPoint("TOPLEFT", bossScrollFrame, "TOPRIGHT", 12, 0)
 	contentScrollFrame:SetPoint("BOTTOMRIGHT", -28, 10)
 
@@ -284,6 +295,48 @@ local function CreateFrameOnce()
 	return f
 end
 
+local COMPACT_WIDTH, COMPACT_HEIGHT = 380, 260
+
+GITGUD.compactMode = false
+
+-- Compact mode hides the boss list and role/difficulty selectors, leaving
+-- only the title bar and the current everyone/role text - for glancing at
+-- the guidance mid-fight without the full picker taking up screen space.
+-- Keeps whatever boss/role/difficulty was already selected; just changes
+-- what's visible and how wide the text wraps.
+local function ApplyCompactMode()
+	local compact = GITGUD.compactMode
+	local isRaid = GITGUD.currentInstance and GITGUD.currentInstance.kind == "raid"
+
+	bossScrollFrame:SetShown(not compact)
+	frame.difficultyRow:SetShown(not compact and isRaid)
+	frame.roleRow:SetShown(not compact)
+
+	contentScrollFrame:ClearAllPoints()
+	local contentWidth
+	if compact then
+		frame:SetSize(COMPACT_WIDTH, COMPACT_HEIGHT)
+		contentScrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -32)
+		contentScrollFrame:SetPoint("BOTTOMRIGHT", -28, 10)
+		contentWidth = COMPACT_WIDTH - 32
+	else
+		frame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
+		contentScrollFrame:SetPoint("TOPLEFT", bossScrollFrame, "TOPRIGHT", 12, 0)
+		contentScrollFrame:SetPoint("BOTTOMRIGHT", -28, 10)
+		contentWidth = FRAME_WIDTH - BOSS_LIST_WIDTH - 76
+	end
+
+	everyoneText:SetWidth(contentWidth)
+	roleText:SetWidth(contentWidth)
+	contentScrollChild:SetWidth(contentWidth)
+	RefreshContent()
+end
+
+function GITGUD.ToggleCompactMode()
+	GITGUD.compactMode = not GITGUD.compactMode
+	if frame then ApplyCompactMode() end
+end
+
 function GITGUD.ShowWindow(instance)
 	CreateFrameOnce()
 
@@ -315,6 +368,7 @@ function GITGUD.ShowWindow(instance)
 		nextIndex = i -- all killed: leave it on the last boss
 	end
 	SelectBoss(nextIndex)
+	ApplyCompactMode() -- re-applies whatever compact state was already set
 
 	frame:Show()
 end
