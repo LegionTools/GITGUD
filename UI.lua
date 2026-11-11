@@ -90,10 +90,13 @@ end
 
 -- Data strings use "\n" for line breaks (SimpleHTML doesn't treat a raw
 -- newline as one, unlike a FontString) and may embed literal
--- `<a href="spell:ID">Name</a>` tags - converted to <br/> here rather
--- than rewriting every data file to use <br/> directly.
+-- `<a href="spell:ID">Name</a>` tags - converted to <br> here rather than
+-- rewriting every data file directly. Plain "<br>", not the self-closing
+-- "<br/>" - the self-closing form silently produced an empty pane live
+-- (this isn't a real HTML parser, just Blizzard's own small tag lexer,
+-- and it apparently doesn't recognize the XHTML-style slash).
 local function ToHTML(text)
-	return (text:gsub("\n", "<br/>"))
+	return (text:gsub("\n", "<br>"))
 end
 
 local function RefreshContent()
@@ -107,7 +110,7 @@ local function RefreshContent()
 		local role = byDifficulty and byDifficulty[GITGUD.currentRole]
 
 		if everyone then
-			html = html .. "<p>|cffffd200Для всех:|r<br/>" .. ToHTML(everyone) .. "</p>"
+			html = html .. "<p>|cffffd200Для всех:|r<br>" .. ToHTML(everyone) .. "</p>"
 		end
 
 		local roleBody
@@ -118,7 +121,7 @@ local function RefreshContent()
 		else
 			roleBody = "Особых указаний для этой роли нет — смотри общие советы выше."
 		end
-		html = html .. "<p>|cffffd200" .. ROLE_LABELS[GITGUD.currentRole] .. ":|r<br/>" .. roleBody .. "</p>"
+		html = html .. "<p>|cffffd200" .. ROLE_LABELS[GITGUD.currentRole] .. ":|r<br>" .. roleBody .. "</p>"
 	end
 
 	contentHTML:SetText(html)
