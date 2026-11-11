@@ -1,0 +1,12 @@
+## Interface: 70300
+## Title: GITGUD
+## Notes: Shows translated (RU) role-specific guidance for the next dungeon/raid boss encounter, auto-opened on zone entry.
+## Author: Colada
+## Version: 0.1.0
+## OptionalDeps: ElvUI
+
+Data/Registry.lua
+Data/TheArcway.lua
+Data/EmeraldNightmare.lua
+UI.lua
+Core.lua
