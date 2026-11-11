@@ -31,9 +31,12 @@ function GITGUD.AddBoss(instance, name, creatureID)
 	return boss
 end
 
--- role is one of "tank" / "healer" / "dps". Each string should be the full,
--- self-contained guidance for that role (any "everyone"-tagged Zygor tips
--- folded in during translation), not just the role-specific delta.
+-- role is "tank" / "healer" / "dps" for a role-specific addition, or the
+-- pseudo-role "everyone" for Zygor's "_EVERYONE:_" common tip - the UI
+-- shows "everyone" once, above whichever role is currently selected,
+-- rather than it being duplicated into all three role strings. A boss
+-- with no addition for a given role simply gets no SetBossText call for
+-- it; the UI falls back to "no extra tip for this role".
 function GITGUD.SetBossText(boss, difficultyKey, role, text)
 	boss.difficulties[difficultyKey] = boss.difficulties[difficultyKey] or {}
 	boss.difficulties[difficultyKey][role] = text

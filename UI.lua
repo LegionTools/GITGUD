@@ -23,7 +23,7 @@ GITGUD.currentDifficulty = nil
 GITGUD.currentRole = nil
 GITGUD.selectedBossIndex = nil
 
-local frame, bossScrollChild, contentText, contentScrollChild
+local frame, bossScrollChild, everyoneText, roleText, contentScrollChild
 local bossRows = {}
 local roleButtons, difficultyButtons = {}, {}
 
@@ -92,14 +92,27 @@ local function RefreshContent()
 	if instance then boss = instance.bosses[GITGUD.selectedBossIndex] end
 
 	if not (instance and boss) then
-		contentText:SetText("")
+		everyoneText:SetText("")
+		roleText:SetText("")
 	else
 		local byDifficulty = boss.difficulties[GITGUD.currentDifficulty]
-		local text = byDifficulty and byDifficulty[GITGUD.currentRole]
-		contentText:SetText(text or "Нет данных для этой роли/сложности.")
+		local everyone = byDifficulty and byDifficulty.everyone
+		local role = byDifficulty and byDifficulty[GITGUD.currentRole]
+
+		everyoneText:SetText(everyone and ("|cffffd200Для всех:|r\n" .. everyone) or "")
+
+		local roleBody
+		if not byDifficulty then
+			roleBody = "Нет данных для этой сложности."
+		elseif role then
+			roleBody = role
+		else
+			roleBody = "Особых указаний для этой роли нет — смотри общие советы выше."
+		end
+		roleText:SetText("|cffffd200" .. ROLE_LABELS[GITGUD.currentRole] .. ":|r\n" .. roleBody)
 	end
 
-	contentScrollChild:SetHeight(math.max(1, contentText:GetStringHeight()))
+	contentScrollChild:SetHeight(math.max(1, everyoneText:GetStringHeight() + 12 + roleText:GetStringHeight()))
 end
 
 local function SelectBoss(index)
@@ -237,15 +250,27 @@ local function CreateFrameOnce()
 	contentScrollChild:SetSize(1, 1) -- resized below once width is known
 	contentScrollFrame:SetScrollChild(contentScrollChild)
 
-	contentText = contentScrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	local contentWidth = FRAME_WIDTH - BOSS_LIST_WIDTH - 76
+
+	-- Everyone's common tip (Zygor's "_EVERYONE:_" block) on top, the
+	-- selected role's own tip below it - two separate FontStrings rather
+	-- than folding everyone's text into each role's string, so it's shown
+	-- once instead of duplicated three times over.
+	everyoneText = contentScrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	-- A few pixels of left padding - flush against the scroll frame's own
 	-- edge clipped the first glyph or two of the first line (confirmed
 	-- live: "ЗАГЛУШКА" rendered as "ГЛУШКА").
-	contentText:SetPoint("TOPLEFT", 16, 0)
-	contentText:SetJustifyH("LEFT")
-	contentText:SetJustifyV("TOP")
-	local contentWidth = FRAME_WIDTH - BOSS_LIST_WIDTH - 76
-	contentText:SetWidth(contentWidth)
+	everyoneText:SetPoint("TOPLEFT", 16, 0)
+	everyoneText:SetJustifyH("LEFT")
+	everyoneText:SetJustifyV("TOP")
+	everyoneText:SetWidth(contentWidth)
+
+	roleText = contentScrollChild:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	roleText:SetPoint("TOPLEFT", everyoneText, "BOTTOMLEFT", 0, -12)
+	roleText:SetJustifyH("LEFT")
+	roleText:SetJustifyV("TOP")
+	roleText:SetWidth(contentWidth)
+
 	contentScrollChild:SetSize(contentWidth, 1)
 	-- FontStrings don't support SetScript/OnTextChanged (that's an EditBox
 	-- script) - RefreshContent resizes the scroll child by hand instead,

@@ -7,6 +7,8 @@ local instance = GITGUD.RegisterInstance(1094, "Emerald Nightmare", "raid")
 
 local function StubAllDifficulties(boss, label)
 	for _, difficultyKey in ipairs({ "lfr", "normal_heroic", "mythic" }) do
+		GITGUD.SetBossText(boss, difficultyKey, "everyone",
+			string.format("ЗАГЛУШКА: общий текст (%s, %s) ещё не переведён.", label, difficultyKey))
 		for _, role in ipairs({ "tank", "healer", "dps" }) do
 			GITGUD.SetBossText(boss, difficultyKey, role,
 				string.format("ЗАГЛУШКА: текст для %s (%s, %s) ещё не переведён.", role, label, difficultyKey))
