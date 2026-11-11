@@ -23,7 +23,7 @@ GITGUD.currentDifficulty = nil
 GITGUD.currentRole = nil
 GITGUD.selectedBossIndex = nil
 
-local frame, bossScrollChild, contentText
+local frame, bossScrollChild, contentText, contentScrollChild
 local bossRows = {}
 local roleButtons, difficultyButtons = {}, {}
 
@@ -93,12 +93,13 @@ local function RefreshContent()
 
 	if not (instance and boss) then
 		contentText:SetText("")
-		return
+	else
+		local byDifficulty = boss.difficulties[GITGUD.currentDifficulty]
+		local text = byDifficulty and byDifficulty[GITGUD.currentRole]
+		contentText:SetText(text or "Нет данных для этой роли/сложности.")
 	end
 
-	local byDifficulty = boss.difficulties[GITGUD.currentDifficulty]
-	local text = byDifficulty and byDifficulty[GITGUD.currentRole]
-	contentText:SetText(text or "Нет данных для этой роли/сложности.")
+	contentScrollChild:SetHeight(math.max(1, contentText:GetStringHeight()))
 end
 
 local function SelectBoss(index)
@@ -232,7 +233,7 @@ local function CreateFrameOnce()
 	contentScrollFrame:SetPoint("TOPLEFT", bossScrollFrame, "TOPRIGHT", 12, 0)
 	contentScrollFrame:SetPoint("BOTTOMRIGHT", -28, 10)
 
-	local contentScrollChild = CreateFrame("Frame", nil, contentScrollFrame)
+	contentScrollChild = CreateFrame("Frame", nil, contentScrollFrame)
 	contentScrollChild:SetSize(1, 1) -- resized below once width is known
 	contentScrollFrame:SetScrollChild(contentScrollChild)
 
@@ -243,9 +244,9 @@ local function CreateFrameOnce()
 	local contentWidth = FRAME_WIDTH - BOSS_LIST_WIDTH - 60
 	contentText:SetWidth(contentWidth)
 	contentScrollChild:SetSize(contentWidth, 1)
-	contentText:SetScript("OnTextChanged", function()
-		contentScrollChild:SetHeight(math.max(1, contentText:GetStringHeight()))
-	end)
+	-- FontStrings don't support SetScript/OnTextChanged (that's an EditBox
+	-- script) - RefreshContent resizes the scroll child by hand instead,
+	-- right after every SetText.
 
 	tinsert(UISpecialFrames, "GITGUDFrame")
 	f:Hide()
